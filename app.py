@@ -1,5 +1,4 @@
 import json
-import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import pandas as pd
@@ -8,29 +7,8 @@ import pandas as pd
 app = Flask(__name__)
 CORS(app)
 
-# Caminho do arquivo de produtos
-ARQUIVO_PRODUTOS = "produtos.json"  # Ajuste conforme necessário para seu ambiente (ex.: /tmp/produtos.json)
-
-# Função para carregar os produtos
-def carregar_produtos():
-    try:
-        if os.path.exists(ARQUIVO_PRODUTOS):
-            with open(ARQUIVO_PRODUTOS, "r", encoding="utf-8") as file:
-                return json.load(file)
-        else:
-            return []
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
-
-# Função para salvar produtos
-def salvar_produtos(produtos):
-    try:
-        with open(ARQUIVO_PRODUTOS, "w", encoding="utf-8") as file:
-            json.dump(produtos, file, indent=4, ensure_ascii=False)
-    except Exception as e:
-        return jsonify({"erro": f"Erro ao salvar os produtos: {str(e)}"}), 500
-
-produtos = carregar_produtos()
+# Lista de produtos em memória
+produtos = []
 
 def validar_dados_produto(produto):
     return bool(produto.get('descricao_produto') and produto.get('cod_barras'))
@@ -62,7 +40,6 @@ def adicionar_produto():
         return jsonify({"erro": "Produto com esse código de barras já existe."}), 409
 
     produtos.append(novo_produto)
-    salvar_produtos(produtos)
     return jsonify(novo_produto), 201
 
 @app.route('/api/produto/<cod_barras>', methods=['PUT'])
@@ -81,21 +58,18 @@ def atualizar_produto(cod_barras):
         "imagem": dados_atualizados.get("imagem", produto.get("imagem", ""))
     })
 
-    salvar_produtos(produtos)
     return jsonify({"mensagem": "Produto atualizado com sucesso", "produto": produto})
 
 @app.route('/api/produto/<cod_barras>', methods=['DELETE'])
 def excluir_produto(cod_barras):
     global produtos
     produtos = [p for p in produtos if str(p["cod_barras"]) != str(cod_barras)]
-    salvar_produtos(produtos)
     return jsonify({"mensagem": "Produto excluído com sucesso"})
 
 @app.route('/api/produtos', methods=['DELETE'])
 def excluir_todos_produtos():
     global produtos
     produtos = []  # Limpa a lista de produtos
-    salvar_produtos(produtos)
     return jsonify({"mensagem": "Todos os produtos foram excluídos com sucesso."})
 
 @app.route('/api/importar_produtos', methods=['POST'])
@@ -130,8 +104,6 @@ def importar_produtos():
                     produtos.append(produto)
                     produtos_importados.append(produto)
 
-            salvar_produtos(produtos)
-
             return jsonify({"mensagem": f"{len(produtos_importados)} produtos importados com sucesso."}), 201
 
         except Exception as e:
@@ -149,8 +121,6 @@ def importar_produtos():
                         continue
                     produtos.append(produto)
                     produtos_importados.append(produto)
-
-            salvar_produtos(produtos)
 
             return jsonify({"mensagem": f"{len(produtos_importados)} produtos importados com sucesso."}), 201
 
